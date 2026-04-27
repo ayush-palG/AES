@@ -78,6 +78,13 @@ AES_Err aes_cbc_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
 AES_Err aes_cfb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
 AES_Err aes_cfb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
 
+// -----------------------------------------------------------------------------
+// OFB Mode - Output FeedBack Mode
+// @iv      - updated to the last ciphertext block on return
+// -----------------------------------------------------------------------------
+
+AES_Err aes_ofb_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
+
 #endif // AES_H_
 
 
@@ -483,6 +490,24 @@ AES_Err aes_cfb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
         for (size_t i = 0; i < len; ++i) {
             out[i] = in[i] ^ temp[i];
         }
+    }
+
+    return AES_OK;
+}
+
+AES_Err aes_ofb_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv)
+{
+    if (!context || !in || !out || !iv) return AES_ERR_NULL_PTR;
+
+    while (len > 0) {
+        cipher(context, iv, iv);
+        size_t chunk = len < AES_BLOCK_SIZE ? len : AES_BLOCK_SIZE;
+        for (size_t j = 0; j < chunk; j++) {
+            out[j] = in[j] ^ iv[j];
+        }
+        in  += chunk;
+        out += chunk;
+        len -= chunk;
     }
 
     return AES_OK;
