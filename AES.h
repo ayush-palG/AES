@@ -49,6 +49,18 @@ static void inv_mix_columns(uint8_t *state);
 static void cipher(const AES_Context *context, const uint8_t *in, uint8_t *out);
 static void inv_cipher(const AES_Context *context, const uint8_t *in, uint8_t *out);
 
+// -----------------------------------------------------------------------------
+// ECB Mode - Electronic CodeBook Mode
+// -----------------------------------------------------------------------------
+
+// No need for these single-block encryption/decryption API
+AES_Err aes_ecb_encrypt_block(const AES_Context *context, const uint8_t *in, uint8_t *out);
+AES_Err aes_ecb_decrypt_block(const AES_Context *context, const uint8_t *in, uint8_t *out);
+
+// len must be a multiple of AES_BLOCK_SIZE
+AES_Err aes_ecb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len);
+AES_Err aes_ecb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len);
+
 #endif // AES_H_
 
 
@@ -301,6 +313,42 @@ static void inv_cipher(const AES_Context *context, const uint8_t *in, uint8_t *o
     for (size_t i = 0; i < sizeof(state) / sizeof(state[0]); ++i) {
         out[i] = state[i];
     }
+}
+
+AES_Err aes_ecb_encrypt_block(const AES_Context *context, const uint8_t *in, uint8_t *out)
+{
+    if (!context || !in || !out) return AES_ERR_NULL_PTR;
+    cipher(context, in, out);
+    return AES_OK;
+}
+
+AES_Err aes_ecb_decrypt_block(const AES_Context *context, const uint8_t *in, uint8_t *out)
+{
+    if (!context || !in || !out) return AES_ERR_NULL_PTR;
+    inv_cipher(context, in, out);
+    return AES_OK;
+}
+
+AES_Err aes_ecb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len)
+{
+    if (!context || !in || !out) return AES_ERR_NULL_PTR;
+    if (len % AES_BLOCK_SIZE != 0) return AES_ERR_INVALID_ARG;
+
+    for (size_t i = 0; i < len; i += AES_BLOCK_SIZE) {
+        cipher(context, in + i, out + i);
+    }
+    return AES_OK;
+}
+
+AES_Err aes_ecb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len)
+{
+    if (!context || !in || !out) return AES_ERR_NULL_PTR;
+    if (len % AES_BLOCK_SIZE != 0) return AES_ERR_INVALID_ARG;
+
+    for (size_t i = 0; i < len; i += AES_BLOCK_SIZE) {
+        inv_cipher(context, in + i, out + i);
+    }
+    return AES_OK;
 }
 
 #endif // AES_IMPLEMENTATION
