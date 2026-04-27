@@ -61,6 +61,15 @@ AES_Err aes_ecb_decrypt_block(const AES_Context *context, const uint8_t *in, uin
 AES_Err aes_ecb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len);
 AES_Err aes_ecb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len);
 
+// -----------------------------------------------------------------------------
+// CBC Mode - Cipher Block Chaining Mode
+// @iv      - 16-byte initialisation vector (not modified)
+// len must be a multiple of AES_BLOCK_SIZE
+// -----------------------------------------------------------------------------
+
+AES_Err aes_cbc_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv);
+AES_Err aes_cbc_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv);
+
 #endif // AES_H_
 
 
@@ -348,6 +357,56 @@ AES_Err aes_ecb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
     for (size_t i = 0; i < len; i += AES_BLOCK_SIZE) {
         inv_cipher(context, in + i, out + i);
     }
+    return AES_OK;
+}
+
+AES_Err aes_cbc_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv)
+{
+    if (!context || !in || !out || !iv) return AES_ERR_NULL_PTR;
+    if (len % AES_BLOCK_SIZE != 0) return AES_ERR_INVALID_ARG;
+
+    uint8_t prev_iv[AES_BLOCK_SIZE];
+    for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+        prev_iv[i] = iv[i];
+    }
+
+    for (size_t i = 0; i < len; i += AES_BLOCK_SIZE) {
+	uint8_t temp[AES_BLOCK_SIZE];
+	for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
+	    temp[j] = in[i + j];
+	}
+        for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
+            temp[j] ^= prev_iv[j];
+        }
+        cipher(context, temp, out + i);
+        for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
+            prev_iv[j] = out[i + j];
+        }
+    }
+
+    return AES_OK;
+}
+
+AES_Err aes_cbc_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv)
+{
+    if (!context || !in || !out || !iv) return AES_ERR_NULL_PTR;
+    if (len % AES_BLOCK_SIZE != 0) return AES_ERR_INVALID_ARG;
+
+    uint8_t prev_iv[AES_BLOCK_SIZE];
+    for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+        prev_iv[i] = iv[i];
+    }
+
+    for (size_t i = 0; i < len; i += AES_BLOCK_SIZE) {
+        inv_cipher(context, in + i, out + i);
+        for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
+            out[i + j] ^= prev_iv[j];
+        }
+        for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
+            prev_iv[j] = in[i + j];
+        }
+    }
+
     return AES_OK;
 }
 
