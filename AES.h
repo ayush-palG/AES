@@ -70,6 +70,14 @@ AES_Err aes_ecb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
 AES_Err aes_cbc_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv);
 AES_Err aes_cbc_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, const uint8_t *iv);
 
+// -----------------------------------------------------------------------------
+// CFB-128 Mode - Cipher FeedBack Mode
+// @iv          - updated to the last ciphertext block on return
+// -----------------------------------------------------------------------------
+
+AES_Err aes_cfb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
+AES_Err aes_cfb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
+
 #endif // AES_H_
 
 
@@ -404,6 +412,76 @@ AES_Err aes_cbc_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
         }
         for (size_t j = 0; j < AES_BLOCK_SIZE; ++j) {
             prev_iv[j] = in[i + j];
+        }
+    }
+
+    return AES_OK;
+}
+
+AES_Err aes_cfb_encrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv)
+{
+    if (!context || !in || !out || !iv) return AES_ERR_NULL_PTR;
+
+    while (len >= AES_BLOCK_SIZE) {
+        uint8_t temp[AES_BLOCK_SIZE];
+        cipher(context, iv, temp);
+        for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+            out[i] = in[i] ^ temp[i];
+        }
+        for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+            iv[i] = out[i];
+        }
+        in += AES_BLOCK_SIZE;
+        out += AES_BLOCK_SIZE;
+        len -= AES_BLOCK_SIZE;
+    }
+
+    if (len > 0) {
+        uint8_t temp[AES_BLOCK_SIZE];
+        cipher(context, iv, temp);
+        for (size_t i = 0; i < len; ++i) {
+            out[i] = in[i] ^ temp[i];
+        }
+        for (size_t i = 0; i < AES_BLOCK_SIZE - len; ++i) {
+            iv[i] = iv[i + len];
+        }
+        for (size_t i = 0; i < len; ++i) {
+            iv[i + AES_BLOCK_SIZE - len] = out[i];
+        }
+    }
+
+    return AES_OK;
+}
+
+AES_Err aes_cfb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv)
+{
+    if (!context || !in || !out) return AES_ERR_NULL_PTR;
+
+    while (len >= AES_BLOCK_SIZE) {
+        uint8_t temp[AES_BLOCK_SIZE];
+        cipher(context, iv, temp);
+        for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+            iv[i] = in[i];
+        }
+        for (size_t i = 0; i < AES_BLOCK_SIZE; ++i) {
+            out[i] = in[i] ^ temp[i];
+        }
+        in += AES_BLOCK_SIZE;
+        out += AES_BLOCK_SIZE;
+        len -= AES_BLOCK_SIZE;
+    }
+
+    if (len > 0) {
+        uint8_t temp[AES_BLOCK_SIZE];
+        cipher(context, iv, temp);
+        for (size_t i = 0; i < AES_BLOCK_SIZE - len; ++i) {
+            iv[i] = iv[i + len];
+        }
+        for (size_t i = 0; i < len; ++i) {
+            iv[i + AES_BLOCK_SIZE - len] = in[i];
+        }
+        for (size_t i = 0; i < len; ++i) {
+            out[i] = in[i] ^ temp[i];
         }
     }
 
