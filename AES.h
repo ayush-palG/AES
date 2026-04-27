@@ -45,7 +45,7 @@ static void inv_sub_bytes(uint8_t *state);
 static void inv_shift_rows(uint8_t *state);
 static void inv_mix_columns(uint8_t *state);
 
-// `in` and `out` should be array of length AES_BLOCK_SIZE 
+// `in` and `out` should be array of length AES_BLOCK_SIZE
 static void cipher(const AES_Context *context, const uint8_t *in, uint8_t *out);
 static void inv_cipher(const AES_Context *context, const uint8_t *in, uint8_t *out);
 
@@ -84,6 +84,13 @@ AES_Err aes_cfb_decrypt(const AES_Context *context, const uint8_t *in, uint8_t *
 // -----------------------------------------------------------------------------
 
 AES_Err aes_ofb_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *iv);
+
+// -----------------------------------------------------------------------------
+// CTR Mode - Counter Mode
+// @nonce   - 16-byte counter block
+// -----------------------------------------------------------------------------
+
+AES_Err aes_ctr_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *nonce);
 
 #endif // AES_H_
 
@@ -167,7 +174,7 @@ static void key_expansion(AES_Context *context, const uint8_t *key)
             // RotWord
             uint8_t t = temp[0];
             temp[0] = temp[1];  temp[1] = temp[2];  temp[2] = temp[3];  temp[3] = t;
-            
+
             // SubWord
             temp[0] = sbox[temp[0]]; temp[1] = sbox[temp[1]];
             temp[2] = sbox[temp[2]]; temp[3] = sbox[temp[3]];
@@ -194,7 +201,7 @@ static inline uint8_t xtime(uint8_t x)
 {
     return (uint8_t)(((x << 1) ^ ((x >> 7) ? 0x1b : 0x00)) & 0xff);
 }
- 
+
 // Multiply two bytes in GF(2^8)
 static uint8_t gf_mul(uint8_t a, uint8_t b)
 {
@@ -324,7 +331,7 @@ static void inv_cipher(const AES_Context *context, const uint8_t *in, uint8_t *o
 
     for (size_t round = 1; round < context->rounds_num; ++round) {
         inv_sub_bytes(state);
-        inv_shift_rows(state);        
+        inv_shift_rows(state);
         add_round_key(state, round_key);
         round_key -= AES_BLOCK_SIZE;
         inv_mix_columns(state);
@@ -504,6 +511,29 @@ AES_Err aes_ofb_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *o
         size_t chunk = len < AES_BLOCK_SIZE ? len : AES_BLOCK_SIZE;
         for (size_t j = 0; j < chunk; j++) {
             out[j] = in[j] ^ iv[j];
+        }
+        in  += chunk;
+        out += chunk;
+        len -= chunk;
+    }
+
+    return AES_OK;
+}
+
+AES_Err aes_ctr_xcrypt(const AES_Context *context, const uint8_t *in, uint8_t *out, size_t len, uint8_t *nonce)
+{
+    if (!context || !in || !out || !nonce) return AES_ERR_NULL_PTR;
+
+    while (len > 0) {
+        uint8_t temp[AES_BLOCK_SIZE];
+        cipher(context, nonce, temp);
+        for (size_t i = AES_BLOCK_SIZE - 1; i >= AES_BLOCK_SIZE - 8; --i) {
+            if (++nonce[i] != 0) break;
+        }
+
+        size_t chunk = len < AES_BLOCK_SIZE ? len : AES_BLOCK_SIZE;
+        for (size_t i = 0; i < chunk; ++i) {
+           out[i] = in[i] ^ temp[i];
         }
         in  += chunk;
         out += chunk;
